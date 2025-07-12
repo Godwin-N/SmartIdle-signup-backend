@@ -1,43 +1,44 @@
+// signup-backend/index.js (updated)
 const express = require('express');
-const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
+const SIGNUPS_FILE = path.join(__dirname, 'signups.json');
 
 app.use(cors());
 app.use(express.json());
 
-const SIGNUPS_FILE = path.join(__dirname, 'signups.json');
+// Ensure signups.json exists
+if (!fs.existsSync(SIGNUPS_FILE)) fs.writeFileSync(SIGNUPS_FILE, '[]');
 
-// Ensure the file exists
-if (!fs.existsSync(SIGNUPS_FILE)) {
-  fs.writeFileSync(SIGNUPS_FILE, '[]');
-}
-
-// Route: POST /signup
 app.post('/render-api/signup', (req, res) => {
   const { name, email } = req.body;
+  if (!name || !email) return res.status(400).json({ message: 'Name and email required' });
 
-  if (!name || !email) {
-    return res.status(400).json({ message: 'Name and email are required.' });
-  }
-
-  const newSignup = { name, email, timestamp: new Date().toISOString() };
-  const existing = JSON.parse(fs.readFileSync(SIGNUPS_FILE));
-  existing.push(newSignup);
-
-  fs.writeFileSync(SIGNUPS_FILE, JSON.stringify(existing, null, 2));
-  res.status(200).json({ message: 'Signup saved successfully.' });
+  const signups = JSON.parse(fs.readFileSync(SIGNUPS_FILE));
+  signups.push({ name, email, timestamp: Date.now() });
+  fs.writeFileSync(SIGNUPS_FILE, JSON.stringify(signups, null, 2));
+  res.json({ message: 'Signup successful' });
 });
 
-// Route: GET /render-api/signups (Optional for admin view)
 app.get('/render-api/signups', (req, res) => {
-  const data = fs.readFileSync(SIGNUPS_FILE);
-  res.status(200).json(JSON.parse(data));
+  const signups = JSON.parse(fs.readFileSync(SIGNUPS_FILE));
+  res.json(signups);
 });
 
-app.listen(PORT, () => {
-  console.log(`Signup backend running on port ${PORT}`);
+app.post('/render-api/delete-signup', (req, res) => {
+  const { index } = req.body;
+  if (typeof index !== 'number') return res.status(400).json({ message: 'Invalid index' });
+
+  let signups = JSON.parse(fs.readFileSync(SIGNUPS_FILE));
+  if (index < 0 || index >= signups.length) return res.status(404).json({ message: 'Entry not found' });
+
+  signups.splice(index, 1);
+  fs.writeFileSync(SIGNUPS_FILE, JSON.stringify(signups, null, 2));
+  res.json({ message: 'Signup deleted' });
 });
+
+app.listen(PORT, () => console.log(`Signup backend running on port ${PORT}`));
